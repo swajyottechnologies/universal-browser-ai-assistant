@@ -1,0 +1,9 @@
+# Extension signing material
+*.pem
+
+# Generated release artifacts
+*.crx
+*.zip
+
+# Node tooling
+node_modules/
