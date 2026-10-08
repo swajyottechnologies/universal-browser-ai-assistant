@@ -3,7 +3,7 @@ const DEFAULTS = {
   model: "MiniMaxAI/MiniMax-M2.7",
   fallbackModels: "deepseek-ai/DeepSeek-V4-Flash-0731,zai-org/GLM-5.3-Flash",
   apiKey: "",
-  maxTokens: 1200,
+  maxTokens: 4096,
   temperature: 0.1,
   timeoutMs: 120000
 };
@@ -337,7 +337,7 @@ async function callProvider(settings, model, messages, tabId, request) {
         model,
         messages,
         temperature: Number(settings.temperature),
-        max_tokens: Number(settings.maxTokens),
+        max_tokens: Math.max(2048, Number(settings.maxTokens) || 4096),
         stream: true
       }),
       signal: controller.signal,
