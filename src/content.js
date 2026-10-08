@@ -54,18 +54,18 @@ function markRuntimeDead(){
   status.textContent="Extension updated — refresh page";
 }
 function esc(x){return String(x??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
-function inline(x){return esc(x).replace(/\\\`([^\\\`]+)\\\`/g,"<code>$1</code>").replace(/\\*\\*([^*]+)\\*\\*/g,"<strong>$1</strong>")}
+function inline(x){return esc(x).replace(/\\`([^\\`]+)\\`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")}
 function md(x){
-  const s=String(x??"").replace(/\\r/g,""),parts=[],re=/\\\`\\\`\\\`([\\s\\S]*?)\\\`\\\`\\\`/g;let last=0,m;
-  while((m=re.exec(s))){parts.push({t:"text",v:s.slice(last,m.index)});parts.push({t:"code",v:m[1].replace(/^\\w+\\n/,"")});last=m.index+m[0].length}
+  const s=String(x??"").replace(/\r/g,""),parts=[],re=/\\`\\`\\`([\s\S]*?)\\`\\`\\`/g;let last=0,m;
+  while((m=re.exec(s))){parts.push({t:"text",v:s.slice(last,m.index)});parts.push({t:"code",v:m[1].replace(/^\w+\n/,"")});last=m.index+m[0].length}
   parts.push({t:"text",v:s.slice(last)});
   let out="";
   for(const p of parts){
     if(p.t==="code"){const value=esc(p.v);out+='<div class="codewrap"><div class="codehead">Code <button class="copycode" data-copy="'+value.replace(/"/g,"&quot;")+'">Copy</button></div><pre class="code">'+value+"</pre></div>";continue}
-    const lines=p.v.split("\\n");
+    const lines=p.v.split("\n");
     for(const line of lines){
       if(!line.trim()){out+='<div style="height:7px"></div>';continue}
-      if(/^\\s*[-*]\\s+/.test(line))out+="<div>• "+inline(line.replace(/^\\s*[-*]\\s+/,""))+"</div>";
+      if(/^\s*[-*]\s+/.test(line))out+="<div>• "+inline(line.replace(/^\s*[-*]\s+/,""))+"</div>";
       else out+="<p>"+inline(line)+"</p>";
     }
   }
@@ -75,14 +75,14 @@ function empty(){chat.innerHTML='<div class="empty"><div class="emptylogo">✦</
 function render(){
   if(!history.length){empty();return}
   chat.innerHTML=history.map((m,i)=>m.role==="user"
-    ?'<div class="msg user"><div class="bubble">'+esc(m.content).replace(/\\n/g,"<br>")+"</div></div>"
+    ?'<div class="msg user"><div class="bubble">'+esc(m.content).replace(/\n/g,"<br>")+"</div></div>"
     :'<div class="msg assistant"><div class="bubble">'+md(m.content)+'</div></div><div class="actions"><button class="mini copy" data-i="'+i+'">Copy</button></div>').join("");
   chat.scrollTop=chat.scrollHeight;
 }
 function open(){lastFocused=document.activeElement;opened=true;launcher.style.display="none";backdrop.classList.add("open");panel.classList.add("open");requestAnimationFrame(()=>input.focus())}
 function close(){opened=false;panel.classList.remove("open");backdrop.classList.remove("open");launcher.style.display="grid";if(lastFocused?.focus)lastFocused.focus()}
 function reset(s){busy=false;send.hidden=false;stop.hidden=true;status.textContent=s;requestId=null;input.disabled=runtimeDead}
-function sanitizeText(value,max){return String(value||"").replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g,"").replace(/\\s+/g," ").trim().slice(0,max)}
+function sanitizeText(value,max){return String(value||"").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").replace(/\s+/g," ").trim().slice(0,max)}
 function isHidden(el){const style=getComputedStyle(el);return style.display==="none"||style.visibility==="hidden"||style.contentVisibility==="hidden"}
 function extractPageText(){
   const selected=sanitizeText(window.getSelection?.().toString()||"",12000);
@@ -92,7 +92,7 @@ function extractPageText(){
   if(!clone)return selected;
   clone.querySelectorAll("script,style,noscript,template,nav,footer,form,[aria-hidden=\"true\"],[hidden],input,textarea,select,button").forEach(el=>el.remove());
   const text=sanitizeText(clone.innerText||clone.textContent||"",24000);
-  return selected ? selected+"\\n\\n"+text : text;
+  return selected ? selected+"\n\n"+text : text;
 }
 function pageContext(){
   contextText.textContent=document.title?("Page: "+sanitizeText(document.title,90)):"Current page";
