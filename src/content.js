@@ -4,7 +4,7 @@ host.id="universal-ai-host";
 host.style.cssText="all:initial;position:fixed;right:0;bottom:0;width:0;height:0;overflow:visible;z-index:2147483647;pointer-events:auto;display:block;visibility:visible";
 document.documentElement.appendChild(host);
 const shadow=host.attachShadow({mode:"closed"});
-shadow.innerHTML=\`
+shadow.innerHTML=`
 <style>
 :host{all:initial}*{box-sizing:border-box}
 .launcher{position:fixed;right:22px;bottom:22px;width:54px;height:54px;border:0;border-radius:18px;display:grid;place-items:center;cursor:pointer;pointer-events:auto;background:linear-gradient(135deg,#8b5cf6,#22d3ee);box-shadow:0 12px 34px #0008,0 0 0 1px #ffffff22;font:700 24px system-ui;color:#fff;transition:.18s transform,.18s box-shadow}.launcher:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 16px 42px #0009,0 0 0 1px #ffffff33}.spark{filter:drop-shadow(0 1px 3px #0006)}
@@ -27,7 +27,7 @@ shadow.innerHTML=\`
 <div class="context"><div class="pill"><span class="dot"></span><span class="contextText">Ready to help with this page</span></div></div>
 <main class="chat" aria-live="polite"></main>
 <footer class="composer"><div class="inputrow"><textarea class="input" rows="1" aria-label="Ask Universal AI Assistant" placeholder="Ask about this page…"></textarea><button class="send" aria-label="Send" title="Send">↑</button><button class="stop" aria-label="Stop generation" title="Stop" hidden>■</button></div><div class="footerline"><span class="status"><span class="statusdot"></span><span class="statusText">Ready</span></span><span class="hint">Enter to send · Shift+Enter for new line</span></div></footer>
-</section>\`;
+</section>`;
 const q=s=>shadow.querySelector(s);
 const launcher=q(".launcher"),backdrop=q(".backdrop"),panel=q(".panel"),chat=q(".chat"),input=q(".input"),send=q(".send"),stop=q(".stop"),status=q(".statusText"),contextText=q(".contextText");
 let history=[],busy=false,requestId=null,conversationId=null,live="",opened=false,runtimeDead=false,lastFocused=null;
@@ -54,9 +54,9 @@ function markRuntimeDead(){
   status.textContent="Extension updated — refresh page";
 }
 function esc(x){return String(x??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
-function inline(x){return esc(x).replace(/\\`([^\\`]+)\\`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")}
+function inline(x){return esc(x).replace(/\x60([^\x60]+)\x60/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")}
 function md(x){
-  const s=String(x??"").replace(/\r/g,""),parts=[],re=/\\`\\`\\`([\s\S]*?)\\`\\`\\`/g;let last=0,m;
+  const s=String(x??"").replace(/\r/g,""),parts=[],re=/\x60\x60\x60([\s\S]*?)\x60\x60\x60/g;let last=0,m;
   while((m=re.exec(s))){parts.push({t:"text",v:s.slice(last,m.index)});parts.push({t:"code",v:m[1].replace(/^\w+\n/,"")});last=m.index+m[0].length}
   parts.push({t:"text",v:s.slice(last)});
   let out="";
