@@ -249,6 +249,11 @@ async function generate(message, tabId) {
         });
 
         output = await callProvider(settings, model, messages, controller, tabId, request);
+        if (!clean(output)) {
+          const empty = new Error("The model returned no visible answer.");
+          empty.code = "EMPTY_RESPONSE";
+          throw empty;
+        }
         usedModel = model;
         break;
       } catch (error) {
@@ -258,7 +263,7 @@ async function generate(message, tabId) {
     }
 
     output = clean(output);
-    if (!output) throw new Error("The model returned an empty response.");
+    if (!output) throw new Error("All configured models returned no visible answer.");
 
     if (!request.discard) {
       await setHistory(conversationId, [
@@ -301,6 +306,7 @@ async function generate(message, tabId) {
 }
 
 function shouldFallback(error) {
+  if (error?.code === "EMPTY_RESPONSE") return true;
   if (error?.status && transientStatus.has(error.status)) return true;
   return error?.name === "TypeError" || error?.name === "NetworkError";
 }
