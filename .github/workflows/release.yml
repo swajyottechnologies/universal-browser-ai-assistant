@@ -79,15 +79,15 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            universal-browser-ai-assistant-v\${{ steps.version.outputs.version }}.crx
-            universal-browser-ai-assistant-v\${{ steps.version.outputs.version }}.zip
+            universal-browser-ai-assistant-v${{ steps.version.outputs.version }}.crx
+            universal-browser-ai-assistant-v${{ steps.version.outputs.version }}.zip
             updates.xml
           generate_release_notes: true
 
       - name: Update public update manifest
         env:
-          GH_TOKEN: \${{ github.token }}
-          VERSION: \${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
