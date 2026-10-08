@@ -29,7 +29,7 @@ jobs:
 
       - name: Prepare signing key
         env:
-          EXTENSION_PEM: \${{ secrets.EXTENSION_PEM }}
+          EXTENSION_PEM: ${{ secrets.EXTENSION_PEM }}
         shell: bash
         run: |
           test -n "$EXTENSION_PEM" || { echo "EXTENSION_PEM secret is not configured"; exit 1; }
@@ -77,7 +77,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: \${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           files: |
             universal-browser-ai-assistant-v\${{ steps.version.outputs.version }}.crx
             universal-browser-ai-assistant-v\${{ steps.version.outputs.version }}.zip
