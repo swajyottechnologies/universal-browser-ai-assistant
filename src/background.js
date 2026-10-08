@@ -220,7 +220,8 @@ async function generate(message, tabId) {
     partial: "",
     chunkBuffer: "",
     chunkTimer: null,
-    finishReason: ""
+    finishReason: "",
+    diagnostics: []
   };
   active.set(tabId, request);
 
@@ -296,7 +297,7 @@ async function generate(message, tabId) {
         type: "GENERATION_ERROR",
         requestId: request.requestId,
         conversationId,
-        error: normalizeError(error)
+        error: normalizeError(error, request)
       });
     }
   } finally {
@@ -311,8 +312,12 @@ function shouldFallback(error) {
   return error?.name === "TypeError" || error?.name === "NetworkError";
 }
 
-function normalizeError(error) {
+function normalizeError(error, request) {
   if (error?.name === "AbortError") return "Generation stopped.";
+  if (error?.code === "EMPTY_RESPONSE") {
+    const details = request?.diagnostics?.length ? " " + request.diagnostics.join(" | ") : "";
+    return "No visible answer was returned." + details;
+  }
   if (error?.status === 401 || error?.status === 403) return "Authentication failed. Check the API key and endpoint.";
   if (error?.status === 404) return "The endpoint or model was not found. Check your settings.";
   if (error?.status === 429) return "The provider is rate-limiting requests.";
@@ -321,6 +326,10 @@ function normalizeError(error) {
 }
 
 async function callProvider(settings, model, messages, tabId, request) {
+  const diag = stage => {
+    if (request.diagnostics.length >= 12) return;
+    request.diagnostics.push(model + ": " + stage);
+  };
   const timeout = Math.min(300000, Math.max(10000, Number(settings.timeoutMs) || 120000));
   const controller = new AbortController();
   request.controller = controller;
@@ -346,6 +355,7 @@ async function callProvider(settings, model, messages, tabId, request) {
     });
 
     if (!response.ok) {
+      diag("stream HTTP " + response.status);
       const body = await response.text();
       const error = new Error("HTTP " + response.status + ": " + body.slice(0, 700));
       error.status = response.status;
@@ -366,7 +376,11 @@ async function callProvider(settings, model, messages, tabId, request) {
     }
 
     const streamed = await readSSE(response.body, tabId, request);
-    if (clean(streamed)) return streamed;
+    if (clean(streamed)) {
+      diag("stream=ok");
+      return streamed;
+    }
+    diag("stream=empty" + (request.finishReason ? ",finish=" + request.finishReason : ""));
 
     // Some OpenAI-compatible brokers can close an SSE stream without exposing
     // the assistant message in delta.content. Retry the same model once using
@@ -401,6 +415,7 @@ async function callProvider(settings, model, messages, tabId, request) {
       });
 
       if (!retry.ok) {
+        diag("chat HTTP " + retry.status);
         const body = await retry.text();
         const error = new Error("HTTP " + retry.status + ": " + body.slice(0, 700));
         error.status = retry.status;
@@ -409,7 +424,11 @@ async function callProvider(settings, model, messages, tabId, request) {
 
       const json = await retry.json();
       const retryText = clean(json?.choices?.[0]?.message?.content || json?.choices?.[0]?.text || "");
-      if (retryText) return retryText;
+      if (retryText) {
+        diag("chat=ok");
+        return retryText;
+      }
+      diag("chat=empty");
 
       // Dahl also exposes the same models through Responses, whose contract
       // returns the final assistant text as output_text. Use it only after
@@ -439,6 +458,7 @@ async function callProvider(settings, model, messages, tabId, request) {
           });
 
           if (!responses.ok) {
+            diag("responses HTTP " + responses.status);
             const body = await responses.text();
             const error = new Error("HTTP " + responses.status + ": " + body.slice(0, 700));
             error.status = responses.status;
@@ -453,7 +473,11 @@ async function callProvider(settings, model, messages, tabId, request) {
               ?.join("") ||
             ""
           );
-          if (outputText) return outputText;
+          if (outputText) {
+            diag("responses=ok");
+            return outputText;
+          }
+          diag("responses=empty");
         } finally {
           clearTimeout(responsesTimer);
           if (request.controller === responsesController) request.controller = null;
