@@ -1,5 +1,5 @@
 (()=>{if(window.top!==window||document.getElementById("universal-ai-host"))return;
-const host=document.createElement("div");host.id="universal-ai-host";host.style.cssText="all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:block;visibility:visible";document.documentElement.appendChild(host);
+const host=document.createElement("div");host.id="universal-ai-host";host.style.cssText="all:initial;position:fixed;right:0;bottom:0;width:0;height:0;overflow:visible;z-index:2147483647;pointer-events:auto;display:block;visibility:visible";document.documentElement.appendChild(host);
 const shadow=host.attachShadow({mode:"closed"});
 shadow.innerHTML=`
 <style>
