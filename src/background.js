@@ -408,7 +408,59 @@ async function callProvider(settings, model, messages, tabId, request) {
       }
 
       const json = await retry.json();
-      return clean(json?.choices?.[0]?.message?.content || json?.choices?.[0]?.text || "");
+      const retryText = clean(json?.choices?.[0]?.message?.content || json?.choices?.[0]?.text || "");
+      if (retryText) return retryText;
+
+      // Dahl also exposes the same models through Responses, whose contract
+      // returns the final assistant text as output_text. Use it only after
+      // Chat Completions produced no visible answer.
+      if (/^https:\/\/inference\.dahl\.global\/v1\/chat\/completions\/?$/i.test(settings.endpoint)) {
+        const responsesController = new AbortController();
+        request.controller = responsesController;
+        const responsesTimer = setTimeout(() => responsesController.abort(), timeout);
+        try {
+          const responsesEndpoint = settings.endpoint.replace(/\/chat\/completions\/?$/i, "/responses");
+          const responses = await fetch(responsesEndpoint, {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + settings.apiKey,
+              "Content-Type": "application/json",
+              Accept: "application/json"
+            },
+            body: JSON.stringify({
+              model,
+              input: messages.map(item => ({
+                role: item.role,
+                content: item.content
+              }))
+            }),
+            signal: responsesController.signal,
+            cache: "no-store"
+          });
+
+          if (!responses.ok) {
+            const body = await responses.text();
+            const error = new Error("HTTP " + responses.status + ": " + body.slice(0, 700));
+            error.status = responses.status;
+            throw error;
+          }
+
+          const responseJson = await responses.json();
+          const outputText = clean(
+            responseJson?.output_text ||
+            responseJson?.output?.flatMap(item => item?.content || [])
+              ?.map(item => item?.text || "")
+              ?.join("") ||
+            ""
+          );
+          if (outputText) return outputText;
+        } finally {
+          clearTimeout(responsesTimer);
+          if (request.controller === responsesController) request.controller = null;
+        }
+      }
+
+      return "";
     } finally {
       clearTimeout(retryTimer);
       if (request.controller === retryController) request.controller = null;
