@@ -46,10 +46,18 @@ jobs:
           VERSION=$(node -p "require('./manifest.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare clean extension package
+        shell: bash
+        run: |
+          rm -rf build
+          mkdir -p build
+          cp manifest.json build/manifest.json
+          cp -R src build/src
+
       - name: Package CRX and ZIP
         env:
-          VERSION: \${{ steps.version.outputs.version }}
-          CRX_URL: https://github.com/\${{ github.repository }}/releases/download/v\${{ steps.version.outputs.version }}/universal-browser-ai-assistant-v\${{ steps.version.outputs.version }}.crx
+          VERSION: ${{ steps.version.outputs.version }}
+          CRX_URL: https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/universal-browser-ai-assistant-v${{ steps.version.outputs.version }}.crx
         shell: bash
         run: |
           ./node_modules/.bin/crx3 \
@@ -60,7 +68,7 @@ jobs:
             --appVersion "$VERSION" \
             --crxURL "$CRX_URL" \
             --browserVersion "102" \
-            .
+            build
 
       - name: Remove private key from workspace
         if: always()
