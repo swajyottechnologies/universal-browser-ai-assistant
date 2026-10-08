@@ -212,9 +212,8 @@ async function generate(message, tabId) {
 
   if (!models.length) throw new Error("No AI model is configured.");
 
-  const controller = new AbortController();
   const request = {
-    controller,
+    controller: null,
     requestId: message.requestId,
     conversationId,
     discard: false,
@@ -248,7 +247,7 @@ async function generate(message, tabId) {
           status: "Generating with " + model + "…"
         });
 
-        output = await callProvider(settings, model, messages, controller, tabId, request);
+        output = await callProvider(settings, model, messages, tabId, request);
         if (!clean(output)) {
           const empty = new Error("The model returned no visible answer.");
           empty.code = "EMPTY_RESPONSE";
@@ -320,8 +319,10 @@ function normalizeError(error) {
   return error?.message || "The AI provider returned an unexpected error.";
 }
 
-async function callProvider(settings, model, messages, controller, tabId, request) {
+async function callProvider(settings, model, messages, tabId, request) {
   const timeout = Math.min(300000, Math.max(10000, Number(settings.timeoutMs) || 120000));
+  const controller = new AbortController();
+  request.controller = controller;
   const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
@@ -366,6 +367,7 @@ async function callProvider(settings, model, messages, controller, tabId, reques
     return await readSSE(response.body, tabId, request);
   } finally {
     clearTimeout(timer);
+    if (request.controller === controller) request.controller = null;
   }
 }
 
