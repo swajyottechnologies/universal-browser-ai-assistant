@@ -219,7 +219,8 @@ async function generate(message, tabId) {
     discard: false,
     partial: "",
     chunkBuffer: "",
-    chunkTimer: null
+    chunkTimer: null,
+    finishReason: ""
   };
   active.set(tabId, request);
 
@@ -361,10 +362,57 @@ async function callProvider(settings, model, messages, tabId, request) {
     const contentType = response.headers.get("content-type") || "";
     if (!(response.body && contentType.toLowerCase().includes("text/event-stream"))) {
       const json = await response.json();
-      return json?.choices?.[0]?.message?.content || json?.choices?.[0]?.text || "";
+      return clean(json?.choices?.[0]?.message?.content || json?.choices?.[0]?.text || "");
     }
 
-    return await readSSE(response.body, tabId, request);
+    const streamed = await readSSE(response.body, tabId, request);
+    if (clean(streamed)) return streamed;
+
+    // Some OpenAI-compatible brokers can close an SSE stream without exposing
+    // the assistant message in delta.content. Retry the same model once using
+    // the non-streaming response contract before trying a fallback model.
+    await send(tabId, {
+      type: "GENERATION_STATUS",
+      requestId: request.requestId,
+      conversationId: request.conversationId,
+      status: "Streaming returned no visible text — retrying normally…"
+    });
+
+    const retryController = new AbortController();
+    request.controller = retryController;
+    const retryTimer = setTimeout(() => retryController.abort(), timeout);
+    try {
+      const retry = await fetch(settings.endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + settings.apiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: Number(settings.temperature),
+          max_tokens: Math.max(2048, Number(settings.maxTokens) || 4096),
+          stream: false
+        }),
+        signal: retryController.signal,
+        cache: "no-store"
+      });
+
+      if (!retry.ok) {
+        const body = await retry.text();
+        const error = new Error("HTTP " + retry.status + ": " + body.slice(0, 700));
+        error.status = retry.status;
+        throw error;
+      }
+
+      const json = await retry.json();
+      return clean(json?.choices?.[0]?.message?.content || json?.choices?.[0]?.text || "");
+    } finally {
+      clearTimeout(retryTimer);
+      if (request.controller === retryController) request.controller = null;
+    }
   } finally {
     clearTimeout(timer);
     if (request.controller === controller) request.controller = null;
@@ -388,7 +436,10 @@ async function readSSE(body, tabId, request) {
 
       for (const event of events) {
         const value = await parseSSEEvent(event, tabId, request);
-        if (value === "__DONE__") return output;
+        if (value === "__DONE__") {
+          await flushChunks(tabId, request);
+          continue;
+        }
         if (value) output += value;
       }
 
@@ -435,8 +486,8 @@ async function parseSSEEvent(event, tabId, request) {
     }
 
     if (choice?.finish_reason) {
+      request.finishReason = choice.finish_reason;
       await flushChunks(tabId, request);
-      return "__DONE__";
     }
   } catch {
     // Ignore malformed individual SSE events; the stream may contain provider keepalives.
