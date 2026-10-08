@@ -1,0 +1,101 @@
+name: Build and publish OTA release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate manifest
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('manifest.json','utf8')); if(m.manifest_version!==3) throw Error('Manifest V3 required'); if(!/^\\d+\\.\\d+\\.\\d+$/.test(m.version)) throw Error('Invalid version: '+m.version); console.log(m.name+' '+m.version);"
+
+      - name: Prepare signing key
+        env:
+          EXTENSION_PEM: \${{ secrets.EXTENSION_PEM }}
+        shell: bash
+        run: |
+          test -n "$EXTENSION_PEM" || { echo "EXTENSION_PEM secret is not configured"; exit 1; }
+          printf '%s' "$EXTENSION_PEM" > extension.pem
+          chmod 600 extension.pem
+
+      - name: Install CRX packer
+        run: npm install --no-save crx3@2.0.0
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare clean extension package
+        shell: bash
+        run: |
+          rm -rf build
+          mkdir -p build
+          cp manifest.json build/manifest.json
+          cp -R src build/src
+
+      - name: Package CRX and ZIP
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CRX_URL: https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/universal-browser-ai-assistant-v${{ steps.version.outputs.version }}.crx
+        shell: bash
+        run: |
+          ./node_modules/.bin/crx3 \
+            -p extension.pem \
+            -o "universal-browser-ai-assistant-v$VERSION.crx" \
+            -z "universal-browser-ai-assistant-v$VERSION.zip" \
+            -x updates.xml \
+            --appVersion "$VERSION" \
+            --crxURL "$CRX_URL" \
+            --browserVersion "102" \
+            build
+
+      - name: Remove private key from workspace
+        if: always()
+        run: rm -f extension.pem
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: \${{ github.ref_name }}
+          files: |
+            universal-browser-ai-assistant-v\${{ steps.version.outputs.version }}.crx
+            universal-browser-ai-assistant-v\${{ steps.version.outputs.version }}.zip
+            updates.xml
+          generate_release_notes: true
+
+      - name: Update public update manifest
+        env:
+          GH_TOKEN: \${{ github.token }}
+          VERSION: \${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp updates.xml /tmp/updates.xml
+          git fetch origin main
+          git checkout main
+          cp /tmp/updates.xml updates.xml
+          git add updates.xml
+          git diff --cached --quiet || git commit -m "chore: publish OTA manifest v$VERSION"
+          git push origin main
