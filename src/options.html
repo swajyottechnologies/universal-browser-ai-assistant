@@ -1,0 +1,9 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Universal AI Assistant — Settings</title><link rel="stylesheet" href="options.css"></head>
+<body><main class="page"><h1>Universal AI Assistant</h1><p>Provider and generation settings</p>
+<label>API endpoint<input id="endpoint"></label>
+<label>Primary model<input id="model"></label>
+<label>Fallback models<input id="fallbackModels"></label>
+<label>API key<input id="apiKey" type="password" autocomplete="off"></label>
+<div class="grid"><label>Max output tokens<input id="maxTokens" type="number" min="128" max="8192"></label><label>Temperature<input id="temperature" type="number" min="0" max="2" step=".05"></label></div>
+<button id="save">Save settings</button><div id="message"></div></main><script src="options.js"></script></body></html>
