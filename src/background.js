@@ -23,7 +23,7 @@ const SYSTEM = [
 ].join(" ");
 
 const clean = value => String(value || "")
-  .replace(/<\\s*(think|analysis|reasoning)\\b[^>]*>[\\s\\S]*?(<\\s*\\/\\s*\\1\\s*>|$)/gi, "")
+  .replace(/<\s*(think|analysis|reasoning)\b[^>]*>[\s\S]*?(<\s*\/\s*\1\s*>|$)/gi, "")
   .trim();
 
 const trimMessages = messages => (Array.isArray(messages) ? messages : [])
@@ -206,7 +206,7 @@ async function generate(message, tabId) {
 
   const conversationId = message.conversationId || await getConversationId(tabId);
   const before = await getHistory(conversationId);
-  const models = [settings.model, ...String(settings.fallbackModels || "").split(/[\\n,]+/)]
+  const models = [settings.model, ...String(settings.fallbackModels || "").split(/[\n,]+/)]
     .map(x => x.trim())
     .filter((x, i, all) => x && all.indexOf(x) === i);
 
@@ -375,7 +375,7 @@ async function readSSE(body, tabId, request) {
       if (chunk.done) break;
 
       buffer += decoder.decode(chunk.value, { stream: true });
-      const events = buffer.split(/\\r?\\n\\r?\\n/);
+      const events = buffer.split(/\r?\n\r?\n/);
       buffer = events.pop() || "";
 
       for (const event of events) {
@@ -403,10 +403,10 @@ async function readSSE(body, tabId, request) {
 
 async function parseSSEEvent(event, tabId, request) {
   const data = event
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => line.startsWith("data:"))
     .map(line => line.slice(5).trimStart())
-    .join("\\n");
+    .join("\n");
 
   if (!data) return "";
   if (data.trim() === "[DONE]") return "__DONE__";
@@ -486,5 +486,5 @@ function buildPrompt(prompt, context) {
     "VISIBLE PAGE CONTENT",
     String(c.pageText || "(none)").slice(0, 24000),
     "END BROWSER CONTEXT"
-  ].join("\\n");
+  ].join("\n");
 }
